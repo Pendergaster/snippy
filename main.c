@@ -2,8 +2,6 @@
  * Check license.txt in project root for license information *
  *********************************************************** */
 
-#if 1
-
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
@@ -16,8 +14,6 @@
 #include <time.h>
 #include <unistd.h>
 #include "defs.h"
-#include "fileutils.h"
-#include "cmath.h"
 
 static int _XlibErrorHandler(Display *display, XErrorEvent *event) {
 
@@ -28,6 +24,14 @@ static int _XlibErrorHandler(Display *display, XErrorEvent *event) {
     return True;
 }
 
+static inline u32 clamp_i32 (i32 val, i32 min, i32 max) {
+    if (val < min) {
+        return min;
+    } else if (val > max){
+        return max;
+    }
+    return val;
+}
 
 static clock_t g_timers[10];
 int g_currentTimer = 0;
@@ -82,13 +86,6 @@ void atom_print(Display* display, Atom atom) {
 void
 clipboard_accept(Display *display, XSelectionRequestEvent *sev, Atom image, u8* data, u32 size) {
     XSelectionEvent ssev;
-    /*
-       time_t now_tm;
-       char *now, *an;
-
-       now_tm = time(NULL);
-       now = ctime(&now_tm);
-       */
     char* an = XGetAtomName(display, sev->property);
     printf("Sending data to window 0x%lx, property '%s', size %d\n", sev->requestor, an, size);
     if (an)
@@ -102,7 +99,6 @@ clipboard_accept(Display *display, XSelectionRequestEvent *sev, Atom image, u8* 
         atom_print(display, sev->selection);
         atom_print(display, sev->target);
         atom_print(display, sev->property);
-
         /*
            atom name 'CLIPBOARD'
            atom name 'image/jpeg'
@@ -130,28 +126,25 @@ clipboard_accept(Display *display, XSelectionRequestEvent *sev, Atom image, u8* 
         XSelectInput(display, sev->requestor, PropertyChangeMask);
 
         printf("waiting for event...\n");
-
         XEvent event;
         XSelectionEvent ssev;
         while(size > 0) {
-
             // Wait until client has red the data
             do {
                 XNextEvent(display, &event);
             } while (event.type != PropertyNotify ||
                     event.xproperty.atom != targetAtom ||
-                    event.xproperty.state != PropertyDelete /*||
-                                                              event.xproperty.window != requestorWindow */);
+                    event.xproperty.state != PropertyDelete );
 
-                //sleep(3);
-                // send new data
-                printf("got new selection request!!!!\n");
+            /*|| event.xproperty.window != requestorWindow */
+
+            // send new data
 
             atom_print(display, sev->property);
 
             u32 newPackageLen = size > KILOS(256) ? KILOS(256) : size;
 
-            printf("sending size  AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA %d\n", newPackageLen);
+            printf("sending size  %d\n", newPackageLen);
 
             XChangeProperty(display, sev->requestor, sev->property, image, 8, PropModeReplace,
                     (unsigned char *) (data), newPackageLen);
@@ -168,11 +161,9 @@ clipboard_accept(Display *display, XSelectionRequestEvent *sev, Atom image, u8* 
 
             XSendEvent(display, sev->requestor, True, NoEventMask, (XEvent *)&ssev);
         }
+
         // Send zero lenght packet to message the end
-
         // Wait until client has red the data
-
-
         do {
             XNextEvent(display, &event);
         } while (event.type != PropertyNotify ||
@@ -189,7 +180,7 @@ clipboard_accept(Display *display, XSelectionRequestEvent *sev, Atom image, u8* 
                */
 
             //sleep(4);
-            printf("SEND END!\n");
+            printf("INC packages has been sent!\n");
         atom_print(display, sev->property);
 
         printf("sending size %d\n", 0);
@@ -220,7 +211,6 @@ clipboard_accept(Display *display, XSelectionRequestEvent *sev, Atom image, u8* 
 
         XSendEvent(display, sev->requestor, True, NoEventMask, (XEvent *)&ssev);
     }
-
 }
 
 void
@@ -229,26 +219,13 @@ clipboard_send_targets(Display *display, XSelectionRequestEvent *sev, Atom targe
 
     XSelectionEvent ssev;
     char* tempname = XGetAtomName(display, sev->property);
-    printf("Sending data to window 0x%lx, property '%s', size %d\n",
+    printf("Sending targets to window 0x%lx, property '%s', size %d\n",
             sev->requestor,
             tempname,
             (u32)(sizeof(Atom) * numTargets));
 
     if (tempname)
         XFree(tempname);
-
-#if 0
-    XChangeProperty( my_display,
-            event.xselectionrequest.requestor,
-            propertyOfRequestorToSet,
-            XA_ATOM,
-            32, // 32 bits actually means long, according to what I've read // [Note 1]
-            PropModeReplace,
-            (unsigned char *) possibleTargets,
-            sizeof(possibleTargets)/sizeof(possibleTargets[0])  // [Note 3]
-            );
-#endif
-
 
     XChangeProperty(display,
             sev->requestor,
@@ -274,7 +251,6 @@ clipboard_write(Display *display, u8* data, u32 size) {
     Window owner, root;
     int screen;
     Atom sel, image, targets;
-    XSelectionRequestEvent *sev;
 
     screen = DefaultScreen(display);
     root = RootWindow(display, screen);
@@ -293,9 +269,9 @@ clipboard_write(Display *display, u8* data, u32 size) {
     /* Claim ownership of the clipboard. */
     XSetSelectionOwner(display, sel, owner, CurrentTime);
 
+    XSelectionRequestEvent *sev;
     for (;;)
     {
-
         XEvent event;
         XNextEvent(display, &event);
         switch (event.type)
@@ -400,34 +376,6 @@ window_get_location(Display *display) {
 XImage*
 image_create_true_color(Display *display, Visual *visual, u8 *image, int width, int height) {
 
-#if 0
-    unsigned char *p=image;
-    int i,j;
-    for(i=0; i < width; i++)
-    {
-        for(j=0; j < height; j++)
-        {
-            if((i<256)&&(j<256))
-            {
-                *p++=rand()%256; // blue
-                *p++=rand()%256; // green
-                *p++=rand()%256; // red
-            }
-            else
-            {
-                *p++=i%256; // blue
-                *p++=j%256; // green
-                if(i<256)
-                    *p++=i%256; // red
-                else if(j<256)
-                    *p++=j%256; // red
-                else
-                    *p++=(256-j)%256; // red
-            }
-            p++;
-        }
-    }
-#endif
     return XCreateImage(display, visual, 24, ZPixmap, 0, (char*)image, width, height, 32, 0);
 }
 
@@ -476,7 +424,6 @@ main(i32 argc, char** argv) {
     Display* display = XOpenDisplay(NULL);
 
     Window root = DefaultRootWindow(display);
-    Visual *visual = NULL;
     int major,minor;
 
     if (XdbeQueryExtension(display, &major, &minor)) {
@@ -494,7 +441,8 @@ main(i32 argc, char** argv) {
         // and the depth varies.
         XVisualInfo xvisinfo_templ;
         xvisinfo_templ.visualid = info->visinfo[0].visual; // We know there's at least one
-        // As far as I know, screens are densely packed, so we can assume that if at least 1 exists, it's screen 0.
+        // As far as I know, screens are densely packed,
+        // so we can assume that if at least 1 exists, it's screen 0.
         xvisinfo_templ.screen = 0;
         xvisinfo_templ.depth = info->visinfo[0].depth;
 
@@ -507,7 +455,7 @@ main(i32 argc, char** argv) {
             return 111;
         }
 
-
+#if 0   // for debugginf monitors visuals
         printf("%d supported visuals\n", info->count);
         for (int i = 0; i < info->count; ++i) {
             printf("visual %d/%d: id %d, depth %d, perf %d\n",
@@ -516,12 +464,12 @@ main(i32 argc, char** argv) {
                     info->visinfo[i].depth,
                     info->visinfo[i].perflevel);
         }
+#endif
         printf("We got xvisinfo: id: %d, screen %d, depth %d\n",
                 (int)xvisinfo_match->visualid, xvisinfo_match->screen, xvisinfo_match->depth);
 
 
         // We can use Visual from the match
-        visual = xvisinfo_match->visual;
     } else {
         printf("Xdbe not supported\n");
         return EXIT_FAILURE;
@@ -550,39 +498,12 @@ main(i32 argc, char** argv) {
             monitor.height - 1);
 
     printf("image %d %d\n", image->width, image->height);
-#if 1
+
     int c = 0;
-
-
-
-
-
-
-
     for(int i = 0; i < image->height; i++) {
         for(int i2 = 0; i2 < image->width; i2++) {
             c++;
 
-#if 0
-
-            y * image->width * 4 + x
-
-
-                imagedata[(x + (monitor.width - 1) * y) * 4] = blue * 0.7;
-            imagedata[(x + (monitor.width - 1) * y) * 4 + 1] = green * 0.7;
-            imagedata[(x + (monitor.width - 1) * y) * 4 + 2] = red * 0.7;
-#endif
-#if 0
-            //int (*put_pixel)            (struct _XImage *, int, int, unsigned long);
-            unsigned long byte = image->f.get_pixel(image, i2, i);
-
-            ((unsigned char*)&byte)[0] *= 0.7;
-            ((unsigned char*)&byte)[1] *= 0.7;
-            ((unsigned char*)&byte)[2] *= 0.7;
-            ((unsigned char*)&byte)[3] *= 0.7;
-
-            image->f.put_pixel(image, i2, i, byte);
-#else
             image->data[i * image->width * 4 + i2 * 4] =
                 (u8)image->data[i * image->width * 4 + i2 * 4] * 0.5;
 
@@ -594,16 +515,12 @@ main(i32 argc, char** argv) {
 
             image->data[i * image->width * 4 + i2 * 4 + 3] =
                 (u8)image->data[i * image->width * 4 + i2 * 4 + 3] * 0.5;
-
-            //image->data[i * image->width * 4 + i2 + 3] *= 0.9;
-#endif
         }
     }
 
-    printf("image %d %d\n", image->width, image->height);
-    printf("darken!! %d\n", c);
-#endif
-    /*
+    printf("image dimensions %d %d\n", image->width, image->height);
+
+#if 0  // for debugging
        timer_start();
        stbi_write_png_compression_level = 2;
        stbi_write_png("./test.png", monitor.width - 1, monitor.height - 1, 3, imagedata, 0);
@@ -618,16 +535,12 @@ main(i32 argc, char** argv) {
        printf("IMAGESIZE IS %d\n", (int)size);
 
        clipboard_write(display, _imagedata, size);
-       */
+#endif
 
     printf("creating window\n");
 
     // create window and image
-
     XVisualInfo vinfo;
-
-
-
 
     if (!XMatchVisualInfo(display, DefaultScreen(display), 24, TrueColor, &vinfo)) {
         printf("No visual found supporting 32 bit color, terminating\n");
@@ -653,13 +566,14 @@ main(i32 argc, char** argv) {
 
     GC backGC = XCreateGC(display, backbuffer, 0, NULL);
 
+    // TODO check
     i32 d_drawColor = BlackPixel(display, DefaultScreen(display));
+    (void)d_drawColor;
 
     //XSelectInput(display, overlay, StructureNotifyMask); // get window visible msg
     XSelectInput(display, overlay, ButtonPressMask | ExposureMask | StructureNotifyMask);
 
     XMapWindow(display, overlay);
-#if 1
 
     printf("waiting map notify!\n");
     XEvent ev;
@@ -686,7 +600,6 @@ main(i32 argc, char** argv) {
 
 #if 1
         if(BIT_CHECK(Button1Mask, mask)) {
-            printf("PRESSED 1111 !\n");
             if(!m1Pressed) {
                 m1Pressed = 1;
                 // monitor.x_org, monitor.y_org, monitor.width, monitor.height
@@ -706,21 +619,13 @@ main(i32 argc, char** argv) {
             mouseXend = clamp_i32(mouseXend, 0 , monitor.width - 1);
             mouseYend = clamp_i32(mouseYend, 0 , monitor.height - 1);
 
-            printf("startx %d starty %d endx %d endy %d\n",
-                    mouseXStart, mouseYStart, mouseXend, mouseYend);
-
-            printf("RERERERRE\n");
-
         } else if (m1Pressed == 1) {
 
             break;
         }
 #endif
 
-        //XPutImage(display, overlay, DefaultGC(display, 0), image, 0, 0, 0, 0, image->width, image->height);
-        //XPutImage(display, overlay, DefaultGC(display, 0), image, 0, 0, 0, 0, image->width, image->height);
         XPutImage(display, backbuffer, backGC, image, 0, 0, 0, 0, image->width, image->height);
-
 
         if( mouseXStart != mouseXend || mouseYStart != mouseYend ) {
 
@@ -749,13 +654,11 @@ main(i32 argc, char** argv) {
         swapInfo.swap_action = XdbeBackground;
 
         // XdbeSwapBuffers returns true on success, we return 0 on success.
-        if (!XdbeSwapBuffers(display, &swapInfo, 1))
-            printf("ERROR\n");
-
+        if (!XdbeSwapBuffers(display, &swapInfo, 1)) {
+            printf("ERROR with Xdbe\n");
+            exit(0);
+        }
     }
-
-
-#endif
 
     XUnmapWindow(display, overlay);
 
@@ -787,33 +690,19 @@ main(i32 argc, char** argv) {
                 (u8)brightImage->data[(c * brightImage->width + c2) * 4];
 
             sendData[(imageWidth * i + i2) * 4 + 3] = numeric_max_u8;
-            //(u8)image->data[(c * brightImage->width + c2) * 4 + 3];
         }
     }
 
 
-    size_t size;
+    i32 size;
     timer_start();
 
-    //u8* _imagedata = stbi_write_png("./test.png", imageWidth , imageHeight , 4, sendData, 0, &size);
-    //
     u8* _imagedata = stbi_write_png_to_mem(sendData, 0, imageWidth, imageHeight, 4, &size);
     timer_end("png write");
 
-#if 0
-    timer_start();
-    stbi_write_jpg("./test.jpg", imageWidth , imageHeight , 4, sendData, 100);
-    timer_end("jpg write");
-#endif
-    /*
-
-       u8* _imagedata = load_binary_file("./test.png", &size);
-       printf("IMAGESIZE IS %d\n", (int)size);
-       */
     clipboard_write(display, _imagedata, size);
 
     XCloseDisplay(display);
 
     return EXIT_SUCCESS;
 }
-#endif
