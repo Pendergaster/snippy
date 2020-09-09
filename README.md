@@ -4,8 +4,8 @@ Currently this is WIP project and should not be used. All functions work, but la
 Also more formats needs to be implemented to make copy paste work on applications like libreoffice.
 
 Project uses [Sean Barrets image utilies](https://github.com/nothings/stb/blob/master/stb_image_write.h) to generate png image.
-Also to use project, target requires Xinerama (most system has this to manage multiple physical screens) 
-and Xdbe (window double buffering to reduce flickering) X extensions.
+Also project requires Xinerama (most system has this to manage multiple physical screens) 
+and Xdbe (window double buffering to reduce flickering) X extensions from target computer.
 
 This is very much utility for my own personal needs
 
