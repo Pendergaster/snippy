@@ -10,5 +10,5 @@ and Xdbe (window double buffering to reduce flickering) X extensions from target
 This is very much utility for my own personal needs
 
 # image
-Light are of the desktop is selected area
+Lighter area of the desktop is selected area
 ![image1](snippy_ex.png)
