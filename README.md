@@ -11,4 +11,4 @@ This is very much utility for my own personal needs
 
 # image
 Light are of the desktop is selected area
-!(image1)[snippy_ex.png]
+![image1](snippy_ex.png)
