@@ -455,7 +455,7 @@ main(i32 argc, char** argv) {
             return 111;
         }
 
-#if 0   // for debugginf monitors visuals
+#if 0   // for debugging monitors visuals
         printf("%d supported visuals\n", info->count);
         for (int i = 0; i < info->count; ++i) {
             printf("visual %d/%d: id %d, depth %d, perf %d\n",
@@ -663,7 +663,6 @@ main(i32 argc, char** argv) {
     XUnmapWindow(display, overlay);
 
     // Copy image and send to clients
-
     if(mouseXStart > mouseXend) {
         SWAP_VALUES(mouseXStart, mouseXend);
     }
@@ -696,12 +695,10 @@ main(i32 argc, char** argv) {
 
     i32 size;
     timer_start();
-
     u8* _imagedata = stbi_write_png_to_mem(sendData, 0, imageWidth, imageHeight, 4, &size);
     timer_end("png write");
 
     clipboard_write(display, _imagedata, size);
-
     XCloseDisplay(display);
 
     return EXIT_SUCCESS;
